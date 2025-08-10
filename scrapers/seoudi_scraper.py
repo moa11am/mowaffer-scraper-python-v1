@@ -695,3 +695,133 @@ class SeoudiScraper(BaseScraper):
         logger.info(f"📊 Processed {len(captured_requests)} requests, {len(valid_requests)} valid unique requests")
         logger.info(f"💾 Total raw JSON responses saved: {total_responses_saved}")
         return valid_requests
+    
+    def _save_product_data(self, response_data: Dict, source_url: str) -> int:
+        """Extract and save individual product data from GraphQL response"""
+        products_saved = 0
+        
+        try:
+            # Extract products from various possible structures
+            products_list = []
+            
+            if isinstance(response_data, dict):
+                # Check Seoudi's specific structure: data.connection.*.items
+                if 'data' in response_data and isinstance(response_data['data'], dict):
+                    data = response_data['data']
+                    
+                    # Check for connection structure first
+                    if 'connection' in data and isinstance(data['connection'], dict):
+                        connection = data['connection']
+                        # Handle any connection structure
+                        for key, value in connection.items():
+                            if isinstance(value, dict):
+                                # Check for items (which could be nodes aliased as items)
+                                if 'items' in value and isinstance(value['items'], list):
+                                    products_list = value['items']
+                                    break
+                                # Check for direct nodes
+                                elif 'nodes' in value and isinstance(value['nodes'], list):
+                                    products_list = value['nodes']
+                                    break
+                    
+                    # Check other common structures if not found
+                    if not products_list:
+                        product_keys = ['products', 'items', 'results', 'productSearch', 'searchProducts']
+                        for key in product_keys:
+                            if key in data:
+                                if isinstance(data[key], list):
+                                    products_list = data[key]
+                                    break
+                                elif isinstance(data[key], dict):
+                                    if 'items' in data[key] and isinstance(data[key]['items'], list):
+                                        products_list = data[key]['items']
+                                        break
+                                    elif 'nodes' in data[key] and isinstance(data[key]['nodes'], list):
+                                        products_list = data[key]['nodes']
+                                        break
+                
+                # Direct products/items arrays
+                if not products_list:
+                    if 'products' in response_data and isinstance(response_data['products'], list):
+                        products_list = response_data['products']
+                    elif 'items' in response_data and isinstance(response_data['items'], list):
+                        products_list = response_data['items']
+            
+            # Process each product
+            for product in products_list:
+                if isinstance(product, dict):
+                    # Extract key product information
+                    product_info = self._extract_product_info(product)
+                    product_info['source_url'] = source_url
+                    from datetime import datetime
+                    product_info['scraped_at'] = datetime.now().isoformat()
+                    
+                    # Save to file/database (you can customize this)
+                    self._save_single_product(product_info)
+                    products_saved += 1
+            
+            return products_saved
+            
+        except Exception as e:
+            logger.error(f"❌ Error saving product data: {e}")
+            return 0
+    
+    def _extract_product_info(self, product: Dict) -> Dict:
+        """Extract standardized product information from raw product data"""
+        try:
+            # Common product fields to extract
+            product_info = {
+                'id': product.get('id', ''),
+                'name': product.get('name', product.get('title', '')),
+                'price': product.get('price', product.get('cost', '')),
+                'original_price': product.get('originalPrice', product.get('original_price', '')),
+                'discount': product.get('discount', ''),
+                'brand': product.get('brand', ''),
+                'category': product.get('category', ''),
+                'description': product.get('description', ''),
+                'image_url': product.get('image', product.get('imageUrl', '')),
+                'availability': product.get('availability', product.get('inStock', True)),
+                'sku': product.get('sku', ''),
+                'raw_data': product  # Keep the full raw data for reference
+            }
+            
+            return product_info
+            
+        except Exception as e:
+            logger.error(f"❌ Error extracting product info: {e}")
+            return {'raw_data': product}
+    
+    def _save_single_product(self, product_info: Dict):
+        """Save a single product to file/database"""
+        try:
+            # For now, save to JSON file (you can modify to use database)
+            import json
+            import os
+            from datetime import datetime
+            
+            # Create products directory if it doesn't exist
+            products_dir = "scraped_products"
+            if not os.path.exists(products_dir):
+                os.makedirs(products_dir)
+            
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{products_dir}/seoudi_products_{timestamp}.json"
+            
+            # Append to file (or create new)
+            products_list = []
+            if os.path.exists(filename):
+                try:
+                    with open(filename, 'r', encoding='utf-8') as f:
+                        products_list = json.load(f)
+                except:
+                    products_list = []
+            
+            products_list.append(product_info)
+            
+            # Save back to file
+            with open(filename, 'w', encoding='utf-8') as f:
+                json.dump(products_list, f, ensure_ascii=False, indent=2)
+                
+        except Exception as e:
+            logger.error(f"❌ Error saving single product: {e}")
