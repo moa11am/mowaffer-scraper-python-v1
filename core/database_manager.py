@@ -105,3 +105,18 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"❌ Error getting statistics: {e}")
             return {"error": str(e)}
+
+    # Oscar-specific persistence helpers
+    def insert_oscar_price_history(self, rows: List[Dict[str, Any]]) -> int:
+        """Insert a batch of Oscar product rows into oscar_price_history.
+
+        Returns the number of inserted records, or 0 on error.
+        """
+        try:
+            if not rows:
+                return 0
+            response = self.client.table("oscar_price_history").insert(rows).execute()
+            return len(response.data) if response and getattr(response, "data", None) else 0
+        except Exception as e:
+            logger.error(f"❌ Error inserting oscar_price_history rows: {e}")
+            return 0

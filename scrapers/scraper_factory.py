@@ -30,13 +30,13 @@ class ScraperFactory:
         # Oscar Stores scraper
         if "oscarstores.com" in url_lower:
             from .oscar_scraper import OscarScraper
-            logger.info(f"🏢 Creating Oscar Stores scraper for: {url}")
+            logger.info(f"🏪 Creating Oscar Stores scraper for: {url}")
             return OscarScraper(browser_manager, database_manager)
         
         # Seoudi scraper  
         elif "seoudisupermarket.com" in url_lower:
             from .seoudi_scraper import SeoudiScraper
-            logger.info(f"🏢 Creating Seoudi scraper for: {url}")
+            logger.info(f"🏪 Creating Seoudi scraper for: {url}")
             return SeoudiScraper(browser_manager, database_manager)
         
         # Spinneys scraper (placeholder for future implementation)
@@ -62,6 +62,6 @@ class ScraperFactory:
     def print_supported_domains():
         """Print all supported domains"""
         domains = ScraperFactory.get_supported_domains()
-        print("🏢 Supported domains:")
+        print("🏪 Supported domains:")
         for domain, scraper in domains.items():
             print(f"   • {domain} → {scraper}")
